@@ -1,0 +1,19 @@
+---
+copy_admin_key: True
+
+#iscsi_conf_overrides: {}
+iscsi_pool_name: hdd-pool
+#iscsi_pool_size: "{{ osd_pool_default_size }}"
+
+
+##################
+# RBD-TARGET-API #
+##################
+# Optional settings related to the CLI/API service
+#api_user: admin
+#api_password: admin
+#api_port: 5000
+#api_secure: false
+#loop_delay: 1
+#trusted_ip_list: 192.168.122.1
+
