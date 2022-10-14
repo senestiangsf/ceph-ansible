@@ -10,7 +10,7 @@
   register: result
   until: result is succeeded
 
-- name: install ceph-mds package on redhat or suse
+- name: install ceph-mds package on redhat or SUSE/openSUSE
   package:
     name: "ceph-mds"
     state: "{{ (upgrade_ceph_packages|bool) | ternary('latest','present') }}"
@@ -21,20 +21,22 @@
     - ansible_facts['os_family'] in ['Suse', 'RedHat']
 
 - name: create mds keyring
-  command: ceph --cluster {{ cluster }} --name client.bootstrap-mds --keyring /var/lib/ceph/bootstrap-mds/{{ cluster }}.keyring auth get-or-create mds.{{ mds_name }} osd 'allow rwx' mds 'allow' mon 'allow profile mds' -o /var/lib/ceph/mds/{{ cluster }}-{{ mds_name }}/keyring
-  args:
-    creates: /var/lib/ceph/mds/{{ cluster }}-{{ mds_name }}/keyring
-  changed_when: false
-  when: cephx
+  ceph_key:
+    name: "mds.{{ ansible_facts['hostname'] }}"
+    cluster: "{{ cluster }}"
+    user: client.bootstrap-mds
+    user_key: "/var/lib/ceph/bootstrap-mds/{{ cluster }}.keyring"
+    caps:
+      mon: "allow profile mds"
+      mds: "allow"
+      osd: "allow rwx"
+    dest: "/var/lib/ceph/mds/{{ cluster }}-{{ ansible_facts['hostname'] }}/keyring"
+    import_key: false
+    owner: ceph
+    group: ceph
+    mode: "{{ ceph_keyring_permissions }}"
   no_log: "{{ no_log_on_ceph_key_tasks }}"
-
-- name: set mds key permissions
-  file:
-    path: /var/lib/ceph/mds/{{ cluster }}-{{ mds_name }}/keyring
-    owner: "ceph"
-    group: "ceph"
-    mode: "0600"
-  when: cephx
+  when: cephx | bool
 
 - name: ensure systemd service override directory exists
   file:
@@ -56,7 +58,7 @@
 
 - name: start and add that the metadata service to the init sequence
   service:
-    name: ceph-mds@{{ mds_name }}
+    name: ceph-mds@{{ ansible_facts['hostname'] }}
     state: started
     enabled: yes
     masked: no

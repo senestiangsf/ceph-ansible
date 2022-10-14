@@ -9,9 +9,7 @@
 #
 # If you run a Ceph community version, you have to change the variable: ceph_stable_release to the new release
 #
-# If you run Red Hat Ceph Storage and are doing a **major** update (e.g: from 2 to 3), you have two options:
-#   - if you use a CDN, you have to change the ceph_rhcs_version to a newer one
-#   - if you use an ISO, you have to change the ceph_rhcs_iso_path to the directory containing the new Ceph version
+# If you run Red Hat Ceph Storage and are doing a **major** update (e.g: from 2 to 3), you have to change the ceph_rhcs_version to a newer one
 #
 
 - name: confirm whether user really meant to upgrade the cluster
@@ -29,6 +27,10 @@
       private: no
 
   tasks:
+    - name: import_role ceph-defaults
+      import_role:
+        name: ceph-defaults
+
     - name: exit playbook, if user did not mean to upgrade cluster
       fail:
         msg: >
@@ -37,6 +39,12 @@
            use `-e ireallymeanit=yes` on the command line when
            invoking the playbook"
       when: ireallymeanit != 'yes'
+
+    - name: check if a legacy grafana-server group exists
+      import_role:
+        name: ceph-facts
+        tasks_from: convert_grafana_server_group_name.yml
+      when: groups.get((grafana_server_group_name | default('grafana-server')), []) | length > 0
 
 
 - name: gather facts and check the init system
@@ -50,7 +58,7 @@
     - "{{ nfs_group_name|default('nfss') }}"
     - "{{ client_group_name|default('clients') }}"
     - "{{ iscsi_gw_group_name|default('iscsigws') }}"
-    - "{{ grafana_server_group_name|default('grafana-server') }}"
+    - "{{ monitoring_group_name|default('monitoring') }}"
   tags: always
   any_errors_fatal: True
   become: True
@@ -92,6 +100,7 @@
 
     - import_role:
         name: ceph-infra
+      tags: ceph_infra
 
     - import_role:
         name: ceph-validate
@@ -124,8 +133,8 @@
 
         - name: check ceph release being deployed
           fail:
-            msg: "This version of ceph-ansible is intended for upgrading to Ceph Nautilus only."
-          when: "'nautilus' not in ceph_version.stdout.split()"
+            msg: "This version of ceph-ansible is intended for upgrading to Ceph Pacific only."
+          when: "'pacific' not in ceph_version.stdout.split()"
 
 
 - name: upgrade ceph mon cluster
@@ -141,64 +150,62 @@
   tasks:
     - name: upgrade ceph mon cluster
       block:
-        - name: upgrade ceph mon cluster
-          block:
-            - name: remove ceph aliases
-              file:
-                path: /etc/profile.d/ceph-aliases.sh
-                state: absent
-              when: containerized_deployment | bool
+        - name: remove ceph aliases
+          file:
+            path: /etc/profile.d/ceph-aliases.sh
+            state: absent
+          when: containerized_deployment | bool
 
-            - name: set mon_host_count
-              set_fact:
-                mon_host_count: "{{ groups[mon_group_name] | length }}"
+        - name: set mon_host_count
+          set_fact:
+            mon_host_count: "{{ groups[mon_group_name] | length }}"
 
-            - name: fail when less than three monitors
-              fail:
-                msg: "Upgrade of cluster with less than three monitors is not supported."
-              when: mon_host_count | int < 3
+        - name: fail when less than three monitors
+          fail:
+            msg: "Upgrade of cluster with less than three monitors is not supported."
+          when: mon_host_count | int < 3
 
-            - name: select a running monitor
-              set_fact:
-                mon_host: "{{ groups[mon_group_name] | difference([inventory_hostname]) | last }}"
+        - name: select a running monitor
+          set_fact:
+            mon_host: "{{ groups[mon_group_name] | difference([inventory_hostname]) | last }}"
 
-            - import_role:
-                name: ceph-defaults
-            - import_role:
-                name: ceph-facts
+        - import_role:
+            name: ceph-defaults
+        - import_role:
+            name: ceph-facts
+
+        - block:
+            - name: get ceph cluster status
+              command: "{{ container_exec_cmd }} ceph --cluster {{ cluster }} health -f json"
+              register: check_cluster_health
+              delegate_to: "{{ mon_host }}"
 
             - block:
-                - name: get ceph cluster status
-                  command: "{{ container_exec_cmd }} ceph --cluster {{ cluster }} health -f json"
-                  register: check_cluster_health
+                - name: display ceph health detail
+                  command: "{{ container_exec_cmd }} ceph --cluster {{ cluster }} health detail"
                   delegate_to: "{{ mon_host }}"
 
-                - block:
-                    - name: display ceph health detail
-                      command: "{{ container_exec_cmd }} ceph --cluster {{ cluster }} health detail"
-                      delegate_to: "{{ mon_host }}"
-
-                    - name: fail if cluster isn't in an acceptable state
-                      fail:
-                        msg: "cluster is not in an acceptable state!"
-                  when: (check_cluster_health.stdout | from_json).status == 'HEALTH_ERR'
-
-                - name: get the ceph quorum status
-                  command: "{{ container_exec_cmd }} ceph --cluster {{ cluster }} quorum_status -f json"
-                  register: check_quorum_status
-                  delegate_to: "{{ mon_host }}"
-
-                - name: fail if the cluster quorum isn't in an acceptable state
+                - name: fail if cluster isn't in an acceptable state
                   fail:
-                    msg: "cluster quorum is not in an acceptable state!"
-                  when: (check_quorum_status.stdout | from_json).quorum | length != groups[mon_group_name] | length
-              when: inventory_hostname == groups[mon_group_name] | first
+                    msg: "cluster is not in an acceptable state!"
+              when: (check_cluster_health.stdout | from_json).status == 'HEALTH_ERR'
+
+            - name: get the ceph quorum status
+              command: "{{ container_exec_cmd }} ceph --cluster {{ cluster }} quorum_status -f json"
+              register: check_quorum_status
+              delegate_to: "{{ mon_host }}"
+
+            - name: fail if the cluster quorum isn't in an acceptable state
+              fail:
+                msg: "cluster quorum is not in an acceptable state!"
+              when: (check_quorum_status.stdout | from_json).quorum | length != groups[mon_group_name] | length
+          when: inventory_hostname == groups[mon_group_name] | first
 
         - name: ensure /var/lib/ceph/bootstrap-rbd-mirror is present
           file:
             path: /var/lib/ceph/bootstrap-rbd-mirror
-            owner: "{{ ceph_uid if containerized_deployment else 'ceph' }}"
-            group: "{{ ceph_uid if containerized_deployment else 'ceph' }}"
+            owner: "{{ ceph_uid if containerized_deployment | bool else 'ceph' }}"
+            group: "{{ ceph_uid if containerized_deployment | bool else 'ceph' }}"
             mode: '755'
             state: directory
           delegate_to: "{{ item }}"
@@ -219,31 +226,23 @@
             - ['bootstrap-rbd', 'bootstrap-rbd-mirror']
             - "{{ groups[mon_group_name] }}" # so the key goes on all the nodes
           environment:
-            CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment else None }}"
+            CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
             CEPH_CONTAINER_BINARY: "{{ container_binary }}"
           when:
             - cephx | bool
             - inventory_hostname == groups[mon_group_name][0]
 
-        # NOTE: we mask the service so the RPM can't restart it
-        # after the package gets upgraded
-        - name: stop ceph mon - shortname
+    # NOTE: we mask the service so the RPM can't restart it
+    # after the package gets upgraded
+        - name: stop ceph mon
           systemd:
-            name: ceph-mon@{{ ansible_facts['hostname'] }}
+            name: ceph-mon@{{ item }}
             state: stopped
             enabled: no
             masked: yes
-          ignore_errors: True
-
-        # NOTE: we mask the service so the RPM can't restart it
-        # after the package gets upgraded
-        - name: stop ceph mon - fqdn
-          systemd:
-            name: ceph-mon@{{ ansible_facts['fqdn'] }}
-            state: stopped
-            enabled: no
-            masked: yes
-          ignore_errors: True
+          with_items:
+            - "{{ ansible_facts['hostname'] }}"
+            - "{{ ansible_facts['fqdn'] }}"
 
         # only mask the service for mgr because it must be upgraded
         # after ALL monitors, even when collocated
@@ -272,7 +271,9 @@
             name: ceph-mgr@{{ ansible_facts['hostname'] }}
             state: started
             enabled: yes
-          ignore_errors: True # if no mgr collocated with mons
+            masked: no
+          when: inventory_hostname in groups[mgr_group_name] | default([])
+                or groups[mgr_group_name] | default([]) | length == 0
 
         - name: import_role ceph-facts
           import_role:
@@ -452,11 +453,17 @@
           when: (balancer_status_update.stdout | from_json)['active'] | bool
 
         - name: disable pg autoscale on pools
-          command: "{{ ceph_cmd }} --cluster {{ cluster }} osd pool set {{ item.name }} pg_autoscale_mode off"
+          ceph_pool:
+            name: "{{ item.name }}"
+            cluster: "{{ cluster }}"
+            pg_autoscale_mode: false
           with_items: "{{ pools_pgautoscaler_mode }}"
           when:
             - pools_pgautoscaler_mode is defined
             - item.mode == 'on'
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
 
         - name: set osd flags
           ceph_osd_flag:
@@ -480,6 +487,11 @@
   become: True
   gather_facts: false
   tasks:
+    - import_role:
+        name: ceph-defaults
+    - import_role:
+        name: ceph-facts
+
     - name: get osd numbers - non container
       shell: if [ -d /var/lib/ceph/osd ] ; then ls /var/lib/ceph/osd | sed 's/.*-//' ; fi  # noqa 306
       register: osd_ids
@@ -503,10 +515,6 @@
       with_items: "{{ osd_ids.stdout_lines }}"
 
     - import_role:
-        name: ceph-defaults
-    - import_role:
-        name: ceph-facts
-    - import_role:
         name: ceph-handler
     - import_role:
         name: ceph-common
@@ -520,26 +528,20 @@
         name: ceph-osd
 
     - name: scan ceph-disk osds with ceph-volume if deploying nautilus
-      command: "ceph-volume --cluster={{ cluster }} simple scan --force"
+      ceph_volume_simple_scan:
+        cluster: "{{ cluster }}"
+        force: true
       environment:
         CEPH_VOLUME_DEBUG: "{{ ceph_volume_debug }}"
-      when:
-        - ceph_release in ["nautilus", "octopus"]
-        - not containerized_deployment | bool
+      when: not containerized_deployment | bool
 
     - name: activate scanned ceph-disk osds and migrate to ceph-volume if deploying nautilus
-      command: "ceph-volume --cluster={{ cluster }} simple activate --all"
+      ceph_volume_simple_activate:
+        cluster: "{{ cluster }}"
+        osd_all: true
       environment:
         CEPH_VOLUME_DEBUG: "{{ ceph_volume_debug }}"
-      when:
-        - ceph_release in ["nautilus", "octopus"]
-        - not containerized_deployment | bool
-
-    - name: get num_pgs - non container
-      command: "{{ container_exec_cmd_update_osd|default('') }} ceph --cluster {{ cluster }} pg stat --format json"
-      changed_when: false
-      register: ceph_pgs
-      delegate_to: "{{ groups[mon_group_name][0] }}"
+      when: not containerized_deployment | bool
 
     - name: waiting for clean pgs...
       command: "{{ container_exec_cmd_update_osd|default('') }} ceph --cluster {{ cluster }} pg stat --format json"
@@ -547,11 +549,11 @@
       until: >
         (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | length) > 0)
         and
-        (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | selectattr('name', 'search', '^active\\+clean') | map(attribute='num') | list | sum) == (ceph_pgs.stdout | from_json).pg_summary.num_pgs)
+        (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | selectattr('name', 'search', '^active\\+clean') | map(attribute='num') | list | sum) == (ceph_health_post.stdout | from_json).pg_summary.num_pgs)
       delegate_to: "{{ groups[mon_group_name][0] }}"
+      changed_when: false
       retries: "{{ health_osd_check_retries }}"
       delay: "{{ health_osd_check_delay }}"
-      when: (ceph_pgs.stdout | from_json).pg_summary.num_pgs != 0
 
 
 - name: complete osd upgrade
@@ -571,11 +573,17 @@
       delegate_to: "{{ groups[mon_group_name][0] }}"
       block:
         - name: re-enable pg autoscale on pools
-          command: "{{ ceph_cmd }} --cluster {{ cluster }} osd pool set {{ item.name }} pg_autoscale_mode on"
+          ceph_pool:
+            name: "{{ item.name }}"
+            cluster: "{{ cluster }}"
+            pg_autoscale_mode: true
           with_items: "{{ pools_pgautoscaler_mode }}"
           when:
             - pools_pgautoscaler_mode is defined
             - item.mode == 'on'
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
 
         - name: unset osd flags
           ceph_osd_flag:
@@ -593,29 +601,6 @@
           command: "{{ ceph_cmd }} --cluster {{ cluster }} balancer on"
           changed_when: false
           when: (balancer_status_update.stdout | from_json)['active'] | bool
-
-        - name: set_fact container_exec_cmd_osd
-          set_fact:
-            container_exec_cmd_update_osd: "{{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }}"
-          when: containerized_deployment | bool
-
-        - name: get osd versions
-          command: "{{ container_exec_cmd_update_osd|default('') }} ceph --cluster {{ cluster }} versions"
-          register: ceph_versions
-          changed_when: false
-
-        - name: set_fact ceph_versions_osd
-          set_fact:
-            ceph_versions_osd: "{{ (ceph_versions.stdout|from_json).osd }}"
-
-        # length == 1 means there is a single osds versions entry
-        # thus all the osds are running the same version
-        - name: complete osds upgrade
-          command: "{{ container_exec_cmd_update_osd|default('') }} ceph --cluster {{ cluster }} osd require-osd-release nautilus"
-          when:
-            - (ceph_versions.get('stdout', '{}')|from_json).get('osd', {}) | length == 1
-            - ceph_versions_osd | string is search("ceph version 14")
-
 
 - name: upgrade ceph mdss cluster, deactivate all rank > 0
   hosts: "{{ mon_group_name | default('mons') }}[0]"
@@ -635,16 +620,28 @@
           when: groups.get(mds_group_name, []) | length > 1
           block:
             - name: set max_mds 1 on ceph fs
-              command: "{{ container_exec_cmd | default('') }} ceph --cluster {{ cluster }} fs set {{ cephfs }} max_mds 1"
-              changed_when: false
+              ceph_fs:
+                name: "{{ cephfs }}"
+                cluster: "{{ cluster }}"
+                data: "{{ cephfs_data_pool.name }}"
+                metadata: "{{ cephfs_metadata_pool.name }}"
+                max_mds: 1
+              environment:
+                CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
+                CEPH_CONTAINER_BINARY: "{{ container_binary }}"
 
             - name: wait until only rank 0 is up
-              command: "{{ container_exec_cmd | default('') }} ceph --cluster {{ cluster }} fs get {{ cephfs }} -f json"
-              changed_when: false
+              ceph_fs:
+                name: "{{ cephfs }}"
+                cluster: "{{ cluster }}"
+                state: info
               register: wait_rank_zero
               retries: 720
               delay: 5
               until: (wait_rank_zero.stdout | from_json).mdsmap.in | length == 1 and (wait_rank_zero.stdout | from_json).mdsmap.in[0]  == 0
+              environment:
+                CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
+                CEPH_CONTAINER_BINARY: "{{ container_binary }}"
 
             - name: get name of remaining active mds
               command: "{{ container_exec_cmd | default('') }} ceph --cluster {{ cluster }} fs dump -f json"
@@ -788,9 +785,16 @@
         name: ceph-mds
 
     - name: set max_mds
-      command: "{{ container_exec_cmd | default('') }} ceph --cluster {{ cluster }} fs set {{ cephfs }} max_mds {{ mds_max_mds }}"
-      changed_when: false
+      ceph_fs:
+        name: "{{ cephfs }}"
+        cluster: "{{ cluster }}"
+        max_mds: "{{ mds_max_mds }}"
+        data: "{{ cephfs_data_pool.name }}"
+        metadata: "{{ cephfs_metadata_pool.name }}"
       delegate_to: "{{ groups[mon_group_name][0] }}"
+      environment:
+        CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
+        CEPH_CONTAINER_BINARY: "{{ container_binary }}"
       when: inventory_hostname == groups['standby_mdss'] | last
 
 
@@ -1006,23 +1010,10 @@
   gather_facts: false
   become: true
   tasks:
-    - import_role:
-        name: ceph-defaults
-    - import_role:
-        name: ceph-facts
-        tasks_from: container_binary.yml
-    - import_role:
-        name: ceph-handler
-
-    - import_role:
-        name: ceph-crash
-        tasks_from: systemd.yml
-
     - name: stop the ceph-crash service
       systemd:
         name: "{{ 'ceph-crash@' + ansible_facts['hostname'] if containerized_deployment | bool else 'ceph-crash.service' }}"
         state: stopped
-        daemon_reload: yes
 
     # it needs to be done in a separate task otherwise the stop just before doesn't work.
     - name: mask and disable the ceph-crash service
@@ -1032,19 +1023,17 @@
         masked: yes
 
     - import_role:
+        name: ceph-defaults
+    - import_role:
+        name: ceph-facts
+        tasks_from: container_binary.yml
+    - import_role:
+        name: ceph-handler
+    - import_role:
         name: ceph-crash
 
 - name: complete upgrade
-  hosts:
-    - "{{ mon_group_name | default('mons') }}"
-    - "{{ mgr_group_name | default('mgrs') }}"
-    - "{{ osd_group_name | default('osds') }}"
-    - "{{ mds_group_name | default('mdss') }}"
-    - "{{ rgw_group_name | default('rgws') }}"
-    - "{{ nfs_group_name | default('nfss') }}"
-    - "{{ rbdmirror_group_name | default('rbdmirrors') }}"
-    - "{{ client_group_name | default('clients') }}"
-    - "{{ iscsi_gw_group_name | default('iscsigws') }}"
+  hosts: "{{ mon_group_name | default('mons') }}"
   tags: post_upgrade
   become: True
   gather_facts: false
@@ -1053,46 +1042,23 @@
         name: ceph-defaults
     - import_role:
         name: ceph-facts
+        tasks_from: container_binary.yml
 
-    - name: container | disallow pre-nautilus OSDs and enable all new nautilus-only functionality
-      command: "{{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }} ceph --cluster {{ cluster }} osd require-osd-release nautilus"
+    - name: container | disallow pre-quincy OSDs and enable all new quincy-only functionality
+      command: "{{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }} ceph --cluster {{ cluster }} osd require-osd-release pacific"
       delegate_to: "{{ groups[mon_group_name][0] }}"
       run_once: True
       when:
         - containerized_deployment | bool
         - groups.get(mon_group_name, []) | length > 0
 
-    - name: non container | disallow pre-nautilus OSDs and enable all new nautilus-only functionality
-      command: "ceph --cluster {{ cluster }} osd require-osd-release nautilus"
+    - name: non container | disallow pre-pacific OSDs and enable all new pacific-only functionality
+      command: "ceph --cluster {{ cluster }} osd require-osd-release pacific"
       delegate_to: "{{ groups[mon_group_name][0] }}"
       run_once: True
       when:
         - not containerized_deployment | bool
         - groups.get(mon_group_name, []) | length > 0
-
-    - name: container | enable msgr2 protocol
-      command: "{{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }} ceph --cluster {{ cluster }} mon enable-msgr2"
-      delegate_to: "{{ groups[mon_group_name][0] }}"
-      run_once: True
-      when:
-        - containerized_deployment | bool
-        - groups.get(mon_group_name, []) | length > 0
-
-    - name: non container | enable msgr2 protocol
-      command: "ceph --cluster {{ cluster }} mon enable-msgr2"
-      delegate_to: "{{ groups[mon_group_name][0] }}"
-      run_once: True
-      when:
-        - not containerized_deployment | bool
-        - groups.get(mon_group_name, []) | length > 0
-
-    - import_role:
-        name: ceph-handler
-    - name: import_role ceph-config
-      import_role:
-        name: ceph-config
-      vars:
-        msgr2_migration: True
 
 - name: upgrade node-exporter
   hosts:
@@ -1104,7 +1070,7 @@
     - "{{ rbdmirror_group_name|default('rbdmirrors') }}"
     - "{{ nfs_group_name|default('nfss') }}"
     - "{{ iscsi_gw_group_name|default('iscsigws') }}"
-    - "{{ grafana_server_group_name|default('grafana-server') }}"
+    - "{{ monitoring_group_name|default('monitoring') }}"
   tags: monitoring
   gather_facts: false
   become: true
@@ -1135,7 +1101,7 @@
             name: ceph-node-exporter
 
 - name: upgrade monitoring node
-  hosts: "{{ grafana_server_group_name }}"
+  hosts: "{{ monitoring_group_name }}"
   tags: monitoring
   gather_facts: false
   become: true
