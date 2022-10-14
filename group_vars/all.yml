@@ -35,7 +35,8 @@ ceph_conf_overrides:
      osd scrub min interval:   172800 # 3 days instead of 1 day by default
      osd scrub max interval:   640800 # 2 weeks instead of 1 week by default
 
-ceph_docker_image: "rhceph/rhceph-4-rhel8"
+upgrade_ceph_packages: True
+ceph_docker_image: "rhceph/rhceph-5-rhel8"
 ceph_docker_image_tag: "latest"
 ceph_docker_registry: "redhatregistry.nwu.ac.za"
 #ceph_docker_registry: "registry.redhat.io"
@@ -56,10 +57,10 @@ ceph_docker_registry_password: e9AJ64QF6mPxMW62JD5JzY9
 #alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager:latest"
 #node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:latest"
 
-grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-4-dashboard-rhel8:latest"
-prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:latest"
-alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager:latest"
-node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:latest"
+grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-5-dashboard-rhel8:5"
+prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:v4.6"
+alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager:v4.6"
+node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:v4.6"
 
 
 #############
