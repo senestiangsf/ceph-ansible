@@ -21,11 +21,11 @@ rhcs03
 #rhcs04
 #rhcs05
 
-[rgws]
-rhcs03
-rhcs05
+#[rgws]
+#rhcs03
+#rhcs05
 
-[iscsigws]
-rhcs06
-rhcs07
+#[iscsigws]
+#rhcs06
+#rhcs07
 

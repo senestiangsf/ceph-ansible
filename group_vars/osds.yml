@@ -7,12 +7,12 @@ lvm_volumes:
     data_vg: data-vg-sdd
     wal: wal-lv-sdd
     wal_vg: wal-vg1
-    db: db-lv-sda
+    db: db-lv-sdd
     db_vg: db-vg1
   - data: data-lv-sde
     data_vg: data-vg-sde
     wal: wal-lv-sde
     wal_vg: wal-vg1
-    db: db-lv-sdb
+    db: db-lv-sde
     db_vg: db-vg1
 
