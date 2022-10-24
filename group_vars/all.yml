@@ -7,9 +7,10 @@ containerized_deployment: true
 
 ceph_docker_http_proxy: "http://143.160.36.154:80"
 ceph_docker_https_proxy: "http://143.160.36.154:80"
+ceph_docker_no_proxy: "localhost,127.0.0.1,143.160.0.0/16,redhatregistry.nwu.ac.za"
 ceph_docker_registry_auth: true
-#ceph_docker_registry_username: '4200180|rhcs-arc'
-#ceph_docker_registry_password: eyJhbGciOiJSUzUxMiJ9.eyJzdWIiOiI1OWEyODRiMDkyYTU0MjJkYThlOWIwOGJjZGNiYWFhOCJ9.rurdfAV7o4WmcW38VeyMF3KWKVYm-yYEzmyLJ9JZxQsNrxkOl9IzyokgKzhwmXBSkMM3BHKPgjFSZ41h5rbJSi74DNqmiHd-DhJqx8SEgBc_TBl3aJY4Kz8bAVVeBj8_6tnHTGuPo0LJmCJPoXm8SHoPT_u2lqyBoSOHtHBJS1lzUkzsU3HhwQDSszUn_pe1-hIawGt7TfIzJ0OWgSZdJTaWvQO9xEy6O-vzSnQ4liaZN6MWdkEwTD8SzRSKwIbwxt-FwCooVJWgeO0a_XgbgchHGDkJBSkdHVXLs0Oqt42hWBOKSsfWnsyQNq9prUBlM1bhTLn0FqP-JaOvGov0k_8Q_A8FGCs94vWdEfSedGdBjop3xlnPJ4EqirLsGnKpKECsMzGD_5LxHzhdhdzJ0eouASPJYx66L3u-5-MII22XSssK8kWqxpLrWi9C9rQF824oapBcu0MiaBJt6XUJysch7HNvOIha7Erc5FWGwLXzfnO7dUEDDkjAYgtZmdbk5X71pRvT9pCDf9ElAQPThGZpN2NXazq0VWizAS4ht9GRqn0zyhoA9V-JP93kwePcjDb56nxayLIDbNq0pHAJ27E08JDMlJmPEdx_SV4X1q6Usc-d5XhZ2xFcOBdls1aD8xZD55oZpBZvOr1Y6sLok1yV8sv4SDp5DVvxaUyzrzI
+#ceph_docker_registry_username: '12513764|senestian-rhcs'
+#ceph_docker_registry_password: eyJhbGciOiJSUzUxMiJ9.eyJzdWIiOiIwYTU3ZjA3YmVjYzM0MDliOTk3MTI5ZmJkYjRkYjY5NyJ9.lm3tLWKv7iu14glXumTLU-jTmUb51OyTasocEhaWQZ9V-5R0SIHJkI-bAQkmmRw5SrzY71Ko2xfNMJeNiqdbAj4_C_s_UjJ8sykMS2EvCHCQz0OjfZ7fWQb6r7_keJZrwm3_Z4Y3BKzpOGOiYGe-HFfgXy66zkQDNUgo3mr7glID4HzCy78PvV2uMj-qRTDIO5XuYZPWJrubaE9jU099lB2uOv2ePbzQ6mWl0j-LVUmS2rH-k_RukQ-aZd2eM_12beZk9VV7byvlGGQS3K6UC7YTGHp_80A6VYnXy24QtNDdko-nClIykt8w3KTFiFZEPbVLlaAeDYosqKe86Xe0Yss9c4WNyT0V-Zc69g7YmL4vXn4FKn_sJHa8zUcwe5vRbbw9UBynrNfrP_AvV6IfVCkJkj1fVMToaGA2heFd-_dKQqJumcBsKSDMKCTWq0Tjw9lTnaLrdYGooyGSky2W-OblznRpexQ4VZ593P4NDbJ4k67vkKxoivDOux9sdLykLus3V6s4p-GCWvo-2moql1peDnYK1uwvdDReO_UrwYbysq8CNHWSipcLN37Bc6bPTcSkX5GhkWNfwaGiS54Y4CP37Q7zG2yRKApvZpyZ3qDW7bNRJIk-ntlnt3yVFv3xnoTSiOM8oqxqxC4Guvi23RL3Q7uh0eKaRUy99pkumrg
 
 
 ceph_docker_registry_username: 'jimmy'
@@ -31,8 +32,55 @@ grafana_admin_user: admin
 grafana_admin_password: redhat123
 dashboard_grafana_api_no_ssl_verify: true
 
+configure_firewall: true
+
+
 grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-4-dashboard-rhel8:4-26"
 prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:v4.6"
 alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager"
 node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:v4.6"
+
+#grafana_container_image: "registry.redhat.io/rhceph/rhceph-4-dashboard-rhel8:4-26"
+#prometheus_container_image: "registry.redhat.io/openshift4/ose-prometheus:v4.6"
+#alertmanager_container_image: "registry.redhat.io/openshift4/ose-prometheus-alertmanager:v4.6"
+#node_exporter_container_image: "registry.redhat.io/openshift4/ose-prometheus-node-exporter:v4.6"
+
+ceph_conf_overrides:
+    global:
+     mon osd down out interval: 28800 # 8 hours
+     mon max pg per osd: 400
+     osd pool default size: 4
+     osd pool default min size: 2
+     filestore rocksdb options: "max_background_compactions=8;compaction_readahead_size=2097152;compression=kNoCompression;compact_on_mount=false"
+     filestore omap backend: "rocksdb"
+     mon warn pg max object skew: "-1"
+    osd:
+     osd_memory_target: 12884901888
+     osd_client_watch_timeout: 15
+     osd_heartbeat_grace: 20
+     osd_heartbeat_interval: 5
+     ms async op threads: 6 # default=3
+     ms async max op threads: 10 # default=5
+     osd op num threads per shard hdd: 8 # default=1
+     osd op num threads per shard ssd: 8 # default=2
+     osd scrub min interval:   172800 # 3 days instead of 1 day by default
+     osd scrub max interval:   640800 # 2 weeks instead of 1 week by default
+
+os_tuning_params:
+  - { name: kernel.pid_max, value: 4194303 }
+  - { name: fs.file-max, value: 26234859 }
+  - { name: vm.zone_reclaim_mode, value: 0 }
+  - { name: vm.swappiness, value: 10 }
+  - { name: vm.min_free_kbytes, value: "{{ vm_min_free_kbytes }}" }
+  - { name: net.core.rmem_max, value: 56623104 }
+  - { name: net.core.wmem_max, value: 56623104 }
+  - { name: net.core.rmem_default, value: 56623104 }
+  - { name: net.core.wmem_default, value: 56623104 }
+  - { name: net.core.optmem_max, value: 40960 }
+  - { name: net.core.somaxconn, value: 1024 }
+  - { name: net.core.backlog, value: 50000 }
+  - { name: net.ipv4.tcp_mem, value: 4096 87380 56623104 }
+  - { name: net.ipv4.tcp_rmem, value: 4096 87380 56623104 }
+  - { name: net.ipv4.tcp_wmem, value: 4096 87380 56623104 }
+  - { name: net.ipv4.tcp_fin_timeout, value: 20 }
 

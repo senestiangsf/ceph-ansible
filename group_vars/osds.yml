@@ -1,18 +1,91 @@
 ---
-nb_retry_wait_osd_up: 50
-delay_wait_osd_up: 30
+dmcrypt: true
 osd_scenario: lvm
+crush_rule_config: true
+create_crush_tree: true
+osd_auto_discovery: false
+
+crush_rule_hdd:
+  name: HDD
+  root: default
+  type: host
+  class: hdd
+  default: false
+
+crush_rule_ssd:
+  name: SSD
+  root: default
+  type: host
+  class: ssd
+  default: true
+
+crush_rules:
+  - "{{ crush_rule_hdd }}"
+  - "{{ crush_rule_ssd }}"
+
 lvm_volumes:
-  - data: data-lv-sdd
-    data_vg: data-vg-sdd
-    wal: wal-lv-sdd
+  - data: data-lv-sda
+    data_vg: data-vg-sda
+    wal: wal-lv-sda
     wal_vg: wal-vg1
-    db: db-lv-sdd
+    db: db-lv-sda
     db_vg: db-vg1
-  - data: data-lv-sde
-    data_vg: data-vg-sde
-    wal: wal-lv-sde
+    crush_device_class: ssd
+  - data: data-lv-sdb
+    data_vg: data-vg-sdb
+    wal: wal-lv-sdb
     wal_vg: wal-vg1
-    db: db-lv-sde
+    db: db-lv-sdb
     db_vg: db-vg1
+    crush_device_class: ssd
+  - data: data-lv-sdc
+    data_vg: data-vg-sdc
+    wal: wal-lv-sdc
+    wal_vg: wal-vg2
+    db: db-lv-sdc
+    db_vg: db-vg1
+    crush_device_class: ssd
+  - data: data-lv-sdg
+    data_vg: data-vg-sdg
+    wal: wal-lv-sdg
+    wal_vg: wal-vg1
+    db: db-lv-sdg
+    db_vg: db-vg1
+    crush_device_class: hdd
+  - data: data-lv-sdh
+    data_vg: data-vg-sdh
+    wal: wal-lv-sdh
+    wal_vg: wal-vg1
+    db: db-lv-sdh
+    db_vg: db-vg1
+    crush_device_class: hdd
+  - data: data-lv-sdi
+    data_vg: data-vg-sdi
+    wal: wal-lv-sdi
+    wal_vg: wal-vg1
+    db: db-lv-sdi
+    db_vg: db-vg1
+    crush_device_class: hdd
+  - data: data-lv-sdj
+    data_vg: data-vg-sdj
+    wal: wal-lv-sdj
+    wal_vg: wal-vg1
+    db: db-lv-sdj
+    db_vg: db-vg1
+    crush_device_class: hdd
+  - data: data-lv-sdk
+    data_vg: data-vg-sdk
+    wal: wal-lv-sdk
+    wal_vg: wal-vg1
+    db: db-lv-sdk
+    db_vg: db-vg1
+    crush_device_class: hdd
+  - data: data-lv-sdl
+    data_vg: data-vg-sdl
+    wal: wal-lv-sdl
+    wal_vg: wal-vg1
+    db: db-lv-sdl
+    db_vg: db-vg1
+    crush_device_class: hdd
+
 
