@@ -1,0 +1,38 @@
+---
+fetch_directory: ~/ceph-ansible-keys
+ceph_origin: repository
+ceph_repository: rhcs
+ceph_rhcs_version: 4
+containerized_deployment: true
+
+ceph_docker_http_proxy: "http://143.160.36.154:80"
+ceph_docker_https_proxy: "http://143.160.36.154:80"
+ceph_docker_registry_auth: true
+#ceph_docker_registry_username: '4200180|rhcs-arc'
+#ceph_docker_registry_password: eyJhbGciOiJSUzUxMiJ9.eyJzdWIiOiI1OWEyODRiMDkyYTU0MjJkYThlOWIwOGJjZGNiYWFhOCJ9.rurdfAV7o4WmcW38VeyMF3KWKVYm-yYEzmyLJ9JZxQsNrxkOl9IzyokgKzhwmXBSkMM3BHKPgjFSZ41h5rbJSi74DNqmiHd-DhJqx8SEgBc_TBl3aJY4Kz8bAVVeBj8_6tnHTGuPo0LJmCJPoXm8SHoPT_u2lqyBoSOHtHBJS1lzUkzsU3HhwQDSszUn_pe1-hIawGt7TfIzJ0OWgSZdJTaWvQO9xEy6O-vzSnQ4liaZN6MWdkEwTD8SzRSKwIbwxt-FwCooVJWgeO0a_XgbgchHGDkJBSkdHVXLs0Oqt42hWBOKSsfWnsyQNq9prUBlM1bhTLn0FqP-JaOvGov0k_8Q_A8FGCs94vWdEfSedGdBjop3xlnPJ4EqirLsGnKpKECsMzGD_5LxHzhdhdzJ0eouASPJYx66L3u-5-MII22XSssK8kWqxpLrWi9C9rQF824oapBcu0MiaBJt6XUJysch7HNvOIha7Erc5FWGwLXzfnO7dUEDDkjAYgtZmdbk5X71pRvT9pCDf9ElAQPThGZpN2NXazq0VWizAS4ht9GRqn0zyhoA9V-JP93kwePcjDb56nxayLIDbNq0pHAJ27E08JDMlJmPEdx_SV4X1q6Usc-d5XhZ2xFcOBdls1aD8xZD55oZpBZvOr1Y6sLok1yV8sv4SDp5DVvxaUyzrzI
+
+
+ceph_docker_registry_username: 'jimmy'
+ceph_docker_registry_password: e9AJ64QF6mPxMW62JD5JzY9
+
+ceph_docker_image: "rhceph/rhceph-4-rhel8"
+ceph_docker_image_tag: "4-55"
+#ceph_docker_image_tag: "latest"
+ceph_docker_registry: "redhatregistry.nwu.ac.za"
+#ceph_docker_registry: "registry.redhat.io"
+#ceph_docker_registry_auth: false
+
+dashboard_enabled: true
+dashboard_protocol: https
+dashboard_port: 8443
+dashboard_admin_user: admin
+dashboard_admin_password: redhat123
+grafana_admin_user: admin
+grafana_admin_password: redhat123
+dashboard_grafana_api_no_ssl_verify: true
+
+grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-4-dashboard-rhel8:4-26"
+prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:v4.6"
+alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager"
+node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:v4.6"
+

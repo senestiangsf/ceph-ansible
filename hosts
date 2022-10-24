@@ -1,0 +1,30 @@
+[grafana-server]
+mk2-cephtest01 ansible_connection=local public_network="143.160.72.80/28"
+
+[mons]
+mk2-cephtest01 ansible_host=143.160.72.84 public_network="143.160.72.80/28" monitor_interface="0210-A-Pub-01"
+mk2-cephtest02 ansible_host=143.160.72.85 public_network="143.160.72.80/28" monitor_interface="0210-A-Pub-02"
+mk2-cephtest03 ansible_host=143.160.72.86 public_network="143.160.72.80/28" monitor_interface="0210-A-Pub-03"
+
+[mgrs]
+mk2-cephtest01 ansible_host=143.160.72.84 public_network="143.160.72.80/28" monitor_interface="0210-A-Pub-01"
+mk2-cephtest02 ansible_host=143.160.72.85 public_network="143.160.72.80/28" monitor_interface="0210-A-Pub-02"
+mk2-cephtest03 ansible_host=143.160.72.86 public_network="143.160.72.80/28" monitor_interface="0210-A-Pub-03"
+
+[osds]
+mk2-cephtest01 ansible_host=143.160.72.84 osd_crush_location="{ 'root': 'default', 'datacenter': 'mk2', 'rack': 'rack4', 'host': 'mk2-cephtest01' }" public_network="143.160.72.80/28" cluster_network="172.22.3.0/24"
+#mk2-cephtest02 ansible_host=143.160.72.85 osd_crush_location="{ 'root': 'default', 'datacenter': 'mk2', 'rack': 'rack4', 'host': 'mk2-cephtest02' }" public_network="143.160.72.80/28" cluster_network="172.22.3.0/24"
+#mk2-cephtest03 ansible_host=143.160.72.86 osd_crush_location="{ 'root': 'default', 'datacenter': 'mk2', 'rack': 'rack4', 'host': 'mk2-cephtest03' }" public_network="143.160.72.80/28" cluster_network="172.22.3.0/24"
+#mk2-cephtest04 ansible_host=143.160.72.87 osd_crush_location="{ 'root': 'default', 'datacenter': 'mk2', 'rack': 'rack4', 'host': 'mk2-cephtest04' }" public_network="143.160.72.80/28" cluster_network="172.22.3.0/24"
+
+#[rgws]
+#mk2-cephtest02 ansible_host=143.160.72.85 public_network="143.160.72.80/28" radosgw_interface="0210-A-Pub-02"
+#mk2-cephtest04 ansible_host=143.160.72.87 public_network="143.160.72.80/28" radosgw_interface="0210-A-Pub-04"
+
+#[iscsigws]
+#mk2-cephtest03 ansible_host=143.160.72.86 public_network="143.160.72.80/28"
+#mk2-cephtest04 ansible_host=143.160.72.87 public_network="143.160.72.80/28"
+
+
+
+
