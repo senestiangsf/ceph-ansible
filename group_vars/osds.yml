@@ -1,33 +1,35 @@
 ---
+nb_retry_wait_osd_up: 50
+delay_wait_osd_up: 30
 dmcrypt: true
 osd_scenario: lvm
 crush_rule_config: true
 create_crush_tree: true
 osd_auto_discovery: false
 
-crush_rule_hdd:
-  name: HDD
-  root: default
-  type: host
-  class: hdd
-  default: false
+#crush_rule_hdd:
+#  name: HDD
+#  root: default
+#  type: host
+#  class: hdd
+#  default: false
 
-crush_rule_ssd:
-  name: SSD
-  root: default
-  type: host
-  class: ssd
-  default: true
+#crush_rule_ssd:
+#  name: SSD
+#  root: default
+#  type: host
+#  class: ssd
+#  default: true
 
-crush_rules:
-  - "{{ crush_rule_hdd }}"
-  - "{{ crush_rule_ssd }}"
+#crush_rules:
+#  - "{{ crush_rule_hdd }}"
+#  - "{{ crush_rule_ssd }}"
 
 lvm_volumes:
   - data: data-lv-sda
     data_vg: data-vg-sda
     wal: wal-lv-sda
-    wal_vg: wal-vg1
+    wal_vg: wal-vg1 
     db: db-lv-sda
     db_vg: db-vg1
     crush_device_class: ssd
@@ -41,7 +43,7 @@ lvm_volumes:
   - data: data-lv-sdc
     data_vg: data-vg-sdc
     wal: wal-lv-sdc
-    wal_vg: wal-vg2
+    wal_vg: wal-vg1
     db: db-lv-sdc
     db_vg: db-vg1
     crush_device_class: ssd

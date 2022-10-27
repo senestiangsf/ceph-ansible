@@ -9,7 +9,7 @@ DOCKER_EXEC="{{ container_binary }} exec ceph-nfs-{{ ceph_nfs_service_suffix | d
 {% endif %}
 
 # First, restart the daemon
-{% if containerized_deployment | bool -%}
+{% if containerized_deployment -%}
 systemctl restart $NFS_NAME
 # Wait and ensure the pid exists after restarting the daemon
 while [ $RETRIES -ne 0 ]; do

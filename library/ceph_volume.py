@@ -1,14 +1,6 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import AnsibleModule
-try:
-    from ansible.module_utils.ca_common import exec_command, \
-                                               is_containerized, \
-                                               fatal
-except ImportError:
-    from module_utils.ca_common import exec_command, \
-                                       is_containerized, \
-                                       fatal
 import datetime
 import copy
 import json
@@ -128,12 +120,6 @@ options:
             - Only applicable if action is 'batch'.
         required: false
         default: -1
-    journal_devices:
-        description:
-            - A list of devices for filestore journal to pass to the 'ceph-volume lvm batch' subcommand.
-            - Only applicable if action is 'batch'.
-            - Only applicable if objectstore is 'filestore'.
-        required: false
     block_db_devices:
         description:
             - A list of devices for bluestore block db to pass to the 'ceph-volume lvm batch' subcommand.
@@ -194,40 +180,36 @@ EXAMPLES = '''
 '''
 
 
-def container_exec(binary, container_image, mounts=None):
+def fatal(message, module):
+    '''
+    Report a fatal error and exit
+    '''
+
+    if module:
+        module.fail_json(msg=message, changed=False, rc=1)
+    else:
+        raise(Exception(message))
+
+
+def container_exec(binary, container_image):
     '''
     Build the docker CLI to run a command inside a container
     '''
-    _mounts = {}
-    _mounts['/run/lock/lvm'] = '/run/lock/lvm:z'
-    _mounts['/var/run/udev'] = '/var/run/udev:z'
-    _mounts['/dev'] = '/dev'
-    _mounts['/etc/ceph'] = '/etc/ceph:z'
-    _mounts['/run/lvm'] = '/run/lvm'
-    _mounts['/var/lib/ceph'] = '/var/lib/ceph:z'
-    _mounts['/var/log/ceph'] = '/var/log/ceph:z'
-    if mounts is None:
-        mounts = _mounts
-    else:
-        _mounts.update(mounts)
-
-    volumes = sum(
-        [['-v', '{}:{}'.format(src_dir, dst_dir)]
-            for src_dir, dst_dir in _mounts.items()], [])
-
     container_binary = os.getenv('CEPH_CONTAINER_BINARY')
     command_exec = [container_binary, 'run',
-                    '--rm',
-                    '--privileged',
-                    '--net=host',
-                    '--ipc=host'] + volumes + \
-        ['--entrypoint=' + binary, container_image]
+                    '--rm', '--privileged', '--net=host', '--ipc=host',
+                    '--ulimit', 'nofile=1024:4096',
+                    '-v', '/run/lock/lvm:/run/lock/lvm:z',
+                    '-v', '/var/run/udev/:/var/run/udev/:z',
+                    '-v', '/dev:/dev', '-v', '/etc/ceph:/etc/ceph:z',
+                    '-v', '/run/lvm/:/run/lvm/',
+                    '-v', '/var/lib/ceph/:/var/lib/ceph/:z',
+                    '-v', '/var/log/ceph/:/var/log/ceph/:z',
+                    '--entrypoint=' + binary, container_image]
     return command_exec
 
 
-def build_cmd(action, container_image,
-              cluster='ceph',
-              binary='ceph-volume', mounts=None):
+def build_cmd(action, container_image, cluster='ceph', binary='ceph-volume'):
     '''
     Build the ceph-volume command
     '''
@@ -236,7 +218,7 @@ def build_cmd(action, container_image,
 
     if container_image:
         cmd = container_exec(
-            binary, container_image, mounts=mounts)
+            binary, container_image)
     else:
         binary = [binary]
         cmd = binary
@@ -247,6 +229,28 @@ def build_cmd(action, container_image,
     cmd.extend(action)
 
     return cmd
+
+
+def exec_command(module, cmd):
+    '''
+    Execute command
+    '''
+
+    rc, out, err = module.run_command(cmd)
+    return rc, cmd, out, err
+
+
+def is_containerized():
+    '''
+    Check if we are running on a containerized cluster
+    '''
+
+    if 'CEPH_CONTAINER_IMAGE' in os.environ:
+        container_image = os.getenv('CEPH_CONTAINER_IMAGE')
+    else:
+        container_image = None
+
+    return container_image
 
 
 def get_data(data, data_vg):
@@ -283,7 +287,6 @@ def batch(module, container_image, report=None):
     objectstore = module.params['objectstore']
     batch_devices = module.params.get('batch_devices', None)
     crush_device_class = module.params.get('crush_device_class', None)
-    journal_devices = module.params.get('journal_devices', None)
     journal_size = module.params.get('journal_size', None)
     block_db_size = module.params.get('block_db_size', None)
     block_db_devices = module.params.get('block_db_devices', None)
@@ -326,10 +329,6 @@ def batch(module, container_image, report=None):
         cmd.extend(['--block-db-size', block_db_size])
 
     cmd.extend(batch_devices)
-
-    if journal_devices and objectstore == 'filestore':
-        cmd.append('--journal-devices')
-        cmd.extend(journal_devices)
 
     if block_db_devices and objectstore == 'bluestore':
         cmd.append('--db-devices')
@@ -425,10 +424,7 @@ def list_osd(module, container_image):
 
     # Build the CLI
     action = ['lvm', 'list']
-    cmd = build_cmd(action,
-                    container_image,
-                    cluster,
-                    mounts={'/var/lib/ceph': '/var/lib/ceph:ro'})
+    cmd = build_cmd(action, container_image, cluster)
     if data:
         cmd.append(data)
     cmd.append('--format=json')
@@ -554,7 +550,6 @@ def run_module():
         batch_devices=dict(type='list', required=False, default=[]),
         osds_per_device=dict(type='int', required=False, default=1),
         journal_size=dict(type='str', required=False, default='5120'),
-        journal_devices=dict(type='list', required=False, default=[]),
         block_db_size=dict(type='str', required=False, default='-1'),
         block_db_devices=dict(type='list', required=False, default=[]),
         wal_devices=dict(type='list', required=False, default=[]),
@@ -696,8 +691,6 @@ def run_module():
         rc, cmd, out, err = exec_command(
             module, batch_report_cmd)
         try:
-            if not out:
-                out = '{}'
             report_result = json.loads(out)
         except ValueError:
             strategy_changed_in_out = "strategy changed" in out
@@ -742,6 +735,10 @@ def run_module():
                     module, batch(module, container_image))
         else:
             cmd = batch_report_cmd
+
+    else:
+        module.fail_json(
+            msg='State must either be "create" or "prepare" or "activate" or "list" or "zap" or "batch" or "inventory".', changed=False, rc=1)  # noqa: E501
 
     endd = datetime.datetime.now()
     delta = endd - startd

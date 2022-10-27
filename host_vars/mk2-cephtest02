@@ -1,0 +1,7 @@
+ansible_host: 143.160.72.85  
+monitor_interface: 0210-A-Pub-02
+osd_crush_location: "{ 'root': 'default', 'datacenter': 'mk2', 'rack': 'rack4', 'host': 'mk2-cephtest02' }"
+public_network: 143.160.72.80/28
+cluster_network: 172.22.3.0/24
+radosgw_interface: 0210-A-Pub-02
+

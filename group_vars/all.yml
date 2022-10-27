@@ -34,10 +34,12 @@ dashboard_grafana_api_no_ssl_verify: true
 
 configure_firewall: true
 
+public_network: 143.160.72.80/28
+cluster_network: 172.22.3.0/24
 
 grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-4-dashboard-rhel8:4-26"
 prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:v4.6"
-alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager"
+alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager:v4.6"
 node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:v4.6"
 
 #grafana_container_image: "registry.redhat.io/rhceph/rhceph-4-dashboard-rhel8:4-26"

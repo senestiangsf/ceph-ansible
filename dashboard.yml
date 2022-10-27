@@ -8,7 +8,7 @@
     - "{{ rbdmirror_group_name|default('rbdmirrors') }}"
     - "{{ nfs_group_name|default('nfss') }}"
     - "{{ iscsi_gw_group_name|default('iscsigws') }}"
-    - "{{ monitoring_group_name|default('monitoring') }}"
+    - "{{ grafana_server_group_name|default('grafana-server') }}"
   gather_facts: false
   become: true
   pre_tasks:
@@ -47,7 +47,7 @@
             status: "Complete"
             end: "{{ lookup('pipe', 'date +%Y%m%d%H%M%SZ') }}"
 
-- hosts: "{{ monitoring_group_name }}"
+- hosts: "{{ grafana_server_group_name }}"
   gather_facts: false
   become: true
   pre_tasks:

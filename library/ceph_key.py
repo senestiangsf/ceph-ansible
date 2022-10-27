@@ -18,10 +18,6 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 from ansible.module_utils.basic import AnsibleModule
-try:
-    from ansible.module_utils.ca_common import is_containerized, container_exec, fatal
-except ImportError:
-    from module_utils.ca_common import is_containerized, container_exec, fatal
 import datetime
 import json
 import os
@@ -217,6 +213,47 @@ def str_to_bool(val):
         return False
     else:
         raise ValueError("Invalid input value: %s" % val)
+
+
+def fatal(message, module):
+    '''
+    Report a fatal error and exit
+    '''
+
+    if module:
+        module.fail_json(msg=message, rc=1)
+    else:
+        raise(Exception(message))
+
+
+def container_exec(binary, container_image):
+    '''
+    Build the docker CLI to run a command inside a container
+    '''
+
+    container_binary = os.getenv('CEPH_CONTAINER_BINARY')
+    command_exec = [container_binary,
+                    'run',
+                    '--rm',
+                    '--net=host',
+                    '-v', '/etc/ceph:/etc/ceph:z',
+                    '-v', '/var/lib/ceph/:/var/lib/ceph/:z',
+                    '-v', '/var/log/ceph/:/var/log/ceph/:z',
+                    '--entrypoint=' + binary, container_image]
+    return command_exec
+
+
+def is_containerized():
+    '''
+    Check if we are running on a containerized cluster
+    '''
+
+    if 'CEPH_CONTAINER_IMAGE' in os.environ:
+        container_image = os.getenv('CEPH_CONTAINER_IMAGE')
+    else:
+        container_image = None
+
+    return container_image
 
 
 def generate_secret():
@@ -489,7 +526,7 @@ def run_module():
         dest=dict(type='str', required=False, default='/etc/ceph/'),
         user=dict(type='str', required=False, default='client.admin'),
         user_key=dict(type='str', required=False, default=None),
-        output_format=dict(type='str', required=False, default='json', choices=['json', 'plain', 'xml', 'yaml'])  # noqa: E501
+        output_format=dict(type='str', required=False, default='json', choices=['json', 'plain', 'xml', 'yaml'])
     )
 
     module = AnsibleModule(
@@ -619,6 +656,10 @@ def run_module():
     elif state == "info":
         rc, cmd, out, err = exec_commands(
             module, info_key(cluster, name, user, user_key_path, output_format, container_image))  # noqa: E501
+        if rc != 0:
+            result["stdout"] = "skipped, since {0} does not exist".format(name)
+            result['rc'] = 0
+            module.exit_json(**result)
 
     elif state == "list":
         rc, cmd, out, err = exec_commands(

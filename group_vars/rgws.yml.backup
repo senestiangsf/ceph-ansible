@@ -1,0 +1,35 @@
+---
+#copy_admin_key: false
+
+rgw_create_pools:
+  "{{ rgw_zone }}.rgw.control":
+    pg_num: 16
+    type: replicated
+    size: 4
+    rule_name: hdd-replica4
+  "{{ rgw_zone }}.rgw.meta":
+    pg_num: 16
+    type: replicated
+    size: 4
+    rule_name: hdd-replica4
+  "{{ rgw_zone }}.rgw.log":
+    type: replicated
+    pg_num: 16
+    size: 4
+    rule_name: hdd-replica4
+  "{{ rgw_zone }}.rgw.non-ec":
+    pg_num: 16
+    type: replicated
+    size: 4
+    rule_name: hdd-replica4
+  "{{ rgw_zone }}.rgw.buckets.data":
+    pg_num: 32
+    type: replicated
+    size: 4
+    rule_name: hdd-replica4
+  "{{ rgw_zone }}.rgw.buckets.index":
+    pg_num: 32
+    type: replicated
+    size: 4
+    rule_name: hdd-replica4
+

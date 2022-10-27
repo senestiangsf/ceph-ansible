@@ -150,8 +150,8 @@
     - name: waiting for the monitor to join the quorum...
       command: "{{ container_binary }} run --rm  -v /etc/ceph:/etc/ceph:z --entrypoint=ceph {{ ceph_docker_registry }}/{{ ceph_docker_image }}:{{ ceph_docker_image_tag }} --cluster {{ cluster }} quorum_status --format json"
       register: ceph_health_raw
-      until: ansible_facts['hostname'] in (ceph_health_raw.stdout | trim | from_json)["quorum_names"]
       changed_when: false
+      until: ansible_facts['hostname'] in (ceph_health_raw.stdout | trim | from_json)["quorum_names"]
       retries: "{{ health_mon_check_retries }}"
       delay: "{{ health_mon_check_delay }}"
 
@@ -221,7 +221,6 @@
         name: ceph-defaults
     - import_role:
         name: ceph-facts
-        tasks_from: container_binary.yml
 
     - name: get pool list
       command: "{{ ceph_cmd }} --cluster {{ cluster }} osd pool ls detail -f json"
@@ -246,17 +245,11 @@
       when: (balancer_status_switch.stdout | from_json)['active'] | bool
 
     - name: disable pg autoscale on pools
-      ceph_pool:
-        name: "{{ item.name }}"
-        cluster: "{{ cluster }}"
-        pg_autoscale_mode: false
+      command: "{{ ceph_cmd }} --cluster {{ cluster }} osd pool set {{ item.name }} pg_autoscale_mode off"
       with_items: "{{ pools_pgautoscaler_mode }}"
       when:
         - pools_pgautoscaler_mode is defined
         - item.mode == 'on'
-      environment:
-        CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
-        CEPH_CONTAINER_BINARY: "{{ container_binary }}"
 
     - name: set osd flags
       ceph_osd_flag:
@@ -385,6 +378,13 @@
         name: ceph-osd
 
   post_tasks:
+    - name: get num_pgs
+      command: >
+        {{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }} ceph --cluster {{ cluster }} pg stat --format json
+      register: ceph_pgs
+      delegate_to: "{{ groups[mon_group_name][0] }}"
+      changed_when: false
+
     - name: container - waiting for clean pgs...
       command: >
         {{ container_binary }} exec ceph-mon-{{ hostvars[groups[mon_group_name][0]]['ansible_facts']['hostname'] }} ceph --cluster {{ cluster }} pg stat --format json
@@ -392,10 +392,11 @@
       until: >
         (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | length) > 0)
         and
-        (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | selectattr('name', 'search', '^active\\+clean') | map(attribute='num') | list | sum) == (ceph_health_post.stdout | from_json).pg_summary.num_pgs)
+        (((ceph_health_post.stdout | from_json).pg_summary.num_pg_by_state | selectattr('name', 'search', '^active\\+clean') | map(attribute='num') | list | sum) == (ceph_pgs.stdout | from_json).pg_summary.num_pgs)
       delegate_to: "{{ groups[mon_group_name][0] }}"
       retries: "{{ health_osd_check_retries }}"
       delay: "{{ health_osd_check_delay }}"
+      when: (ceph_pgs.stdout | from_json).pg_summary.num_pgs != 0
       changed_when: false
 
 
@@ -407,20 +408,13 @@
         name: ceph-defaults
     - import_role:
         name: ceph-facts
-        tasks_from: container_binary.yml
 
     - name: re-enable pg autoscale on pools
-      ceph_pool:
-        name: "{{ item.name }}"
-        cluster: "{{ cluster }}"
-        pg_autoscale_mode: true
+      command: "{{ ceph_cmd }} --cluster {{ cluster }} osd pool set {{ item.name }} pg_autoscale_mode on"
       with_items: "{{ pools_pgautoscaler_mode }}"
       when:
         - pools_pgautoscaler_mode is defined
         - item.mode == 'on'
-      environment:
-        CEPH_CONTAINER_IMAGE: "{{ ceph_docker_registry + '/' + ceph_docker_image + ':' + ceph_docker_image_tag if containerized_deployment | bool else None }}"
-        CEPH_CONTAINER_BINARY: "{{ container_binary }}"
 
     - name: unset osd flags
       ceph_osd_flag:
@@ -565,11 +559,17 @@
   serial: 1
   become: true
   pre_tasks:
+    - name: check for ceph rbd mirror services
+      command: systemctl show --no-pager --property=Id --state=enabled ceph-rbd-mirror@*  # noqa 303
+      changed_when: false
+      register: rbdmirror_services
+
     - name: stop non-containerized ceph rbd mirror(s)
       service:
-        name: "ceph-rbd-mirror@rbd-mirror.{{ ansible_facts['hostname'] }}"
+        name: "{{ item.split('=')[1] }}"
         state: stopped
         enabled: no
+      loop: "{{ rbdmirror_services.stdout_lines }}"
 
     - name: remove old systemd unit files
       file:
