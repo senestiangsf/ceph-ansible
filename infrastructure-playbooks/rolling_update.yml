@@ -931,6 +931,11 @@
   serial: 1
   become: True
   gather_facts: false
+  post_tasks:
+    - name: Reboot after upgrade
+      reboot:
+          reboot_timeout: 240
+
   tasks:
     # failed_when: false is here so that if we upgrade
     # from a version of ceph that does not have iscsi gws
