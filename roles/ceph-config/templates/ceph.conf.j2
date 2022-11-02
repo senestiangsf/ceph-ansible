@@ -2,7 +2,7 @@
 # {{ ansible_managed }}
 
 [global]
-{% if not cephx %}
+{% if not cephx | bool %}
 auth cluster required = none
 auth service required = none
 auth client required = none
@@ -24,9 +24,7 @@ osd crush chooseleaf type = 0
 
 {% if nb_mon > 0 and inventory_hostname in groups.get(mon_group_name, []) %}
 mon initial members = {% for host in groups[mon_group_name] %}
-      {% if hostvars[host]['ansible_facts']['fqdn'] is defined and mon_use_fqdn -%}
-        {{ hostvars[host]['ansible_facts']['fqdn'] }}
-      {%- elif hostvars[host]['ansible_facts']['hostname'] is defined -%}
+      {% if hostvars[host]['ansible_facts']['hostname'] is defined -%}
         {{ hostvars[host]['ansible_facts']['hostname'] }}
       {%- endif %}
       {%- if not loop.last %},{% endif %}
@@ -38,16 +36,10 @@ osd pool default crush rule = {{ osd_pool_default_crush_rule }}
 fsid = {{ fsid }}
 mon host = {% if nb_mon > 0 %}
 {% for host in _monitor_addresses -%}
-{% if msgr2_migration | default(False) %}
-[{{ "v2:" + host.addr + mon_host_v2.suffix }},{{ "v1:" + host.addr + mon_host_v1.suffix }}]
-{%- elif not msgr2_migration | default(False) and rolling_update -%}
-{{ host.addr }}
-{%- else -%}
-{% if mon_host_v1.enabled %}
+{% if mon_host_v1.enabled | bool %}
 {% set _v1 = ',v1:' + host.addr + mon_host_v1.suffix %}
 {% endif %}
 [{{ "v2:" + host.addr + mon_host_v2.suffix }}{{ _v1 | default('') }}]
-{%- endif %}
 {%- if not loop.last -%},{%- endif %}
 {%- endfor %}
 {% elif nb_mon == 0 %}
@@ -90,6 +82,17 @@ filestore xattr use omap = true
 {% if osd_objectstore == 'bluestore' %}
 {% set _num_osds = num_osds | default(0) | int %}
 [osd]
+{% if is_hci | bool and _num_osds > 0 %}
+{# hci_safety_factor is the safety factor for HCI deployments #}
+{% if ansible_facts['memtotal_mb'] * 1048576 * hci_safety_factor / _num_osds > osd_memory_target %}
+{% set _osd_memory_target = (ansible_facts['memtotal_mb'] * 1048576 * hci_safety_factor / _num_osds) | int %}
+{% endif %}
+{% elif _num_osds > 0 %}
+{# non_hci_safety_factor is the safety factor for dedicated nodes #}
+{% if ansible_facts['memtotal_mb'] * 1048576 * non_hci_safety_factor / _num_osds > osd_memory_target %}
+{% set _osd_memory_target = (ansible_facts['memtotal_mb'] * 1048576 * non_hci_safety_factor / _num_osds) | int %}
+{% endif %}
+{% endif %}
 osd memory target = {{ _osd_memory_target | default(osd_memory_target) }}
 {% endif %}
 {% endif %}

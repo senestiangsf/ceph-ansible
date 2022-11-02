@@ -23,7 +23,7 @@ mk2-cephtest04
 
 [rgws]
 mk2-cephtest02 
-mk2-cephtest04 
+#mk2-cephtest04 
 
 [iscsigws]
 mk2-cephtest03 

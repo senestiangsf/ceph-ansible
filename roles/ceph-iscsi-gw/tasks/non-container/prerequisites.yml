@@ -79,6 +79,8 @@
             url: "https://download.ceph.com/ceph-iscsi/{{ '3' if use_new_ceph_iscsi | bool else '2' }}/rpm/el{{ ansible_facts['distribution_major_version'] }}/ceph-iscsi.repo"
             dest: /etc/yum.repos.d/ceph-iscsi.repo
             force: true
+          register: result
+          until: result is succeeded
           when: ceph_repository == 'community'
 
     - name: install ceph iscsi package

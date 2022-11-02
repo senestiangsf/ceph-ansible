@@ -3,35 +3,8 @@
   include_tasks: check_system.yml
 
 - name: validate repository variables in non-containerized scenario
+  include_tasks: check_repository.yml
   when: not containerized_deployment | bool
-  block:
-    - name: validate ceph_origin
-      fail:
-        msg: "ceph_origin must be either 'repository', 'distro' or 'local'"
-      when: ceph_origin not in ['repository', 'distro', 'local']
-
-    - name: validate ceph_repository
-      fail:
-        msg: "ceph_repository must be either 'community', 'rhcs', 'dev', 'custom' or 'uca'"
-      when:
-        - ceph_origin == 'repository'
-        - ceph_repository not in ['community', 'rhcs', 'dev', 'custom', 'uca']
-
-    - name: validate ceph_repository_community
-      fail:
-        msg: "ceph_stable_release must be either 'nautilus' or 'octopus'"
-      when:
-        - ceph_origin == 'repository'
-        - ceph_repository == 'community'
-        - ceph_stable_release not in ['nautilus', 'octopus']
-
-    - name: validate ceph_repository_type
-      fail:
-        msg: "ceph_repository_type must be either 'cdn' or 'iso'"
-      when:
-        - ceph_origin == 'repository'
-        - ceph_repository == 'rhcs'
-        - ceph_repository_type not in ['cdn', 'iso']
 
 - name: validate osd_objectstore
   fail:
@@ -89,13 +62,6 @@
         - item.data is undefined
       with_items: '{{ lvm_volumes }}'
 
-- name: warning deprecation for fqdn configuration
-  fail:
-    msg: "fqdn configuration is not supported anymore. Use 'use_fqdn_yes_i_am_sure: true' if you really want to use it. See release notes for more details"
-  when:
-    - mon_use_fqdn | bool or mds_use_fqdn | bool
-    - not use_fqdn_yes_i_am_sure | bool
-
 - name: debian based systems tasks
   when: ansible_facts['os_family'] == 'Debian'
   block:
@@ -110,6 +76,25 @@
       when:
         - ceph_origin == 'repository'
         - ceph_repository == 'rhcs'
+
+# SUSE/openSUSE Leap only supports the following:
+# - ceph_origin == 'distro'
+# - ceph_origin == 'repository' and ceph_repository == 'obs'
+- name: SUSE/openSUSE Leap based system tasks
+  when: ansible_facts['os_family'] == 'Suse'
+  block:
+    - name: Check ceph_origin definition on SUSE/openSUSE Leap
+      fail:
+        msg: "Unsupported installation method origin:{{ ceph_origin }}"
+      when: ceph_origin not in ['distro', 'repository']
+
+    - name: Check ceph_repository definition on SUSE/openSUSE Leap
+      fail:
+        msg: "Unsupported installation method origin:{{ ceph_origin }} repo:{{ ceph_repository }}'
+                  only valid combination is ceph_origin == 'repository' and ceph_repository == 'obs'"
+      when:
+        - ceph_origin == 'repository'
+        - ceph_repository != 'obs'
 
 - name: validate ntp daemon type
   fail:
@@ -199,15 +184,15 @@
     - ceph_rbd_mirror_configure | default(false) | bool
 
 - block:
-    - name: fail if [grafana-server] group doesn't exist
+    - name: fail if monitoring group doesn't exist
       fail:
-        msg: "you must add a [grafana-server] group and add at least one node."
-      when: groups[grafana_server_group_name] is undefined
+        msg: "you must add a monitoring group and add at least one node."
+      when: groups[monitoring_group_name] is undefined
 
-    - name: fail when [grafana-server] doesn't contain at least one node.
+    - name: fail when monitoring doesn't contain at least one node.
       fail:
-        msg: "you must add at least one node in the [grafana-server] hosts group"
-      when: groups[grafana_server_group_name] | length < 1
+        msg: "you must add at least one node in the monitoring hosts group"
+      when: groups[monitoring_group_name] | length < 1
 
     - name: fail when dashboard_admin_password and/or grafana_admin_password are not set
       fail:
@@ -231,6 +216,48 @@
   when:
     - (container_package_name is undefined and container_service_name is defined) or
       (container_package_name is defined and container_service_name is undefined)
+
+- name: validate openstack_keys key format
+  fail:
+    msg: '{{ item.name }} key format invalid'
+  with_items: '{{ openstack_keys }}'
+  when:
+    - osd_group_name in group_names
+    - openstack_keys is defined
+    - openstack_keys | length > 0
+    - item.key is defined
+    - item.key is not match("^[a-zA-Z0-9+/]{38}==$")
+
+- name: validate clients keys key format
+  fail:
+    msg: '{{ item.name }} key format invalid'
+  with_items: '{{ keys }}'
+  when:
+    - client_group_name in group_names
+    - keys is defined
+    - keys | length > 0
+    - item.key is defined
+    - item.key is not match("^[a-zA-Z0-9+/]{38}==$")
+
+- name: validate openstack_keys caps
+  fail:
+    msg: '{{ item.name }} key has no caps defined'
+  with_items: '{{ openstack_keys }}'
+  when:
+    - osd_group_name in group_names
+    - openstack_keys is defined
+    - openstack_keys | length > 0
+    - item.caps is not defined
+
+- name: validate clients keys caps
+  fail:
+    msg: '{{ item.name }} key has no caps defined'
+  with_items: '{{ keys }}'
+  when:
+    - client_group_name in group_names
+    - keys is defined
+    - keys | length > 0
+    - item.caps is not defined
 
 - name: check virtual_ips is defined
   fail:

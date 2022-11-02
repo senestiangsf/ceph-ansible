@@ -10,9 +10,8 @@
   - rbdmirrors
   - clients
   - iscsigws
-  - iscsi-gws # for backward compatibility only!
   - mgrs
-  - grafana-server
+  - monitoring
 
   gather_facts: false
   become: True
@@ -384,7 +383,6 @@
 
 - hosts:
     - iscsigws
-    - iscsi-gws # for backward compatibility only!
   gather_facts: false
   any_errors_fatal: true
   become: True
@@ -426,7 +424,7 @@
 - import_playbook: dashboard.yml
   when:
     - dashboard_enabled | bool
-    - groups.get(grafana_server_group_name, []) | length > 0
+    - groups.get(monitoring_group_name, []) | length > 0
 
 - hosts:
   - mons

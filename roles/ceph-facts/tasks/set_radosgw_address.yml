@@ -39,15 +39,13 @@
   block:
     - name: set_fact _interface
       set_fact:
-        _interface: "{{ (hostvars[item]['radosgw_interface'] | replace('-', '_')) }}"
+        _interface: "{{ (radosgw_interface | replace('-', '_')) }}"
       loop: "{{ groups.get(rgw_group_name, []) }}"
       delegate_to: "{{ item }}"
-      delegate_facts: true
-      run_once: true
 
     - name: set_fact _radosgw_address to radosgw_interface - ipv4
       set_fact:
-        _radosgw_address: "{{ hostvars[item]['ansible_facts'][hostvars[item]['_interface']][ip_version]['address'] }}"
+        _radosgw_address: "{{ hostvars[item]['ansible_facts'][_interface][ip_version]['address'] }}"
       loop: "{{ groups.get(rgw_group_name, []) }}"
       delegate_to: "{{ item }}"
       delegate_facts: true
@@ -55,7 +53,7 @@
 
     - name: set_fact _radosgw_address to radosgw_interface - ipv6
       set_fact:
-        _radosgw_address: "{{ hostvars[item]['ansible_facts'][hostvars[item]['_interface']][ip_version][0]['address'] | ipwrap }}"
+        _radosgw_address: "{{ hostvars[item]['ansible_facts'][_interface][ip_version][0]['address'] | ipwrap }}"
       loop: "{{ groups.get(rgw_group_name, []) }}"
       delegate_to: "{{ item }}"
       delegate_facts: true
@@ -74,12 +72,9 @@
 
 - name: set_fact is_rgw_instances_defined
   set_fact:
-    is_rgw_instances_defined: "{{ hostvars[ceph_dashboard_call_item | default(inventory_hostname)]['rgw_instances'] is defined }}"
-    delegate_to: "{{ ceph_dashboard_call_item if ceph_dashboard_call_item is defined else inventory_hostname }}"
-    delegate_facts: "{{ true if ceph_dashboard_call_item is defined else false }}"
+    is_rgw_instances_defined: "{{ rgw_instances is defined }}"
   when:
-    - inventory_hostname in groups.get(rgw_group_name, []) or
-      ceph_dashboard_call_item is defined
+    - inventory_hostname in groups.get(rgw_group_name, [])
     - rgw_multisite | bool
 
 - name: set_fact rgw_instances with rgw multisite
