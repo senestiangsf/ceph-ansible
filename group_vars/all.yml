@@ -16,8 +16,8 @@ ceph_docker_registry_auth: true
 ceph_docker_registry_username: 'jimmy'
 ceph_docker_registry_password: e9AJ64QF6mPxMW62JD5JzY9
 
-ceph_docker_image: "rhceph/rhceph-5-rhel8"
-ceph_docker_image_tag: "5-268"
+ceph_docker_image: "rhceph/rhceph--rhel8"
+ceph_docker_image_tag: "latest"
 #ceph_docker_image_tag: "latest"
 ceph_docker_registry: "redhatregistry.nwu.ac.za"
 #ceph_docker_registry: "registry.redhat.io"
@@ -32,17 +32,33 @@ grafana_admin_user: admin
 grafana_admin_password: redhat123
 dashboard_grafana_api_no_ssl_verify: true
 
+
+rgw_multisite: true
+rgw_zone: testzone
+rgw_zonegroup: nwuzonegroup
+rgw_realm: myrealm
+rgw_zonemaster: true
+rgw_zonesecondary: false
+rgw_zonegroupmaster: true
+rgw_zone_user: test-user
+rgw_zone_user_display_name: "Test Sync User"
+rgw_multisite_proto: "http"
+system_access_key: 9IQ0QMDGSRO1HZ1I4HXP
+system_secret_key: fcpUeG10Q5ltCumQVDWBPj5k099eRChJzCi3BoWp
+
+
+
 configure_firewall: true
 
-upgrade_ceph_packages: True
+#upgrade_ceph_packages: True
 
 public_network: 143.160.72.80/28
 cluster_network: 172.22.3.0/24
 
-grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-5-dashboard-rhel8:5"
-prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:v4.6"
-alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager:v4.6"
-node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:v4.6"
+grafana_container_image: "redhatregistry.nwu.ac.za/rhceph/rhceph-4-dashboard-rhel8:latest"
+prometheus_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus:latest"
+alertmanager_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-alertmanager:latest"
+node_exporter_container_image: "redhatregistry.nwu.ac.za/openshift4/ose-prometheus-node-exporter:latest"
 
 #grafana_container_image: "registry.redhat.io/rhceph/rhceph-4-dashboard-rhel8:4-26"
 #prometheus_container_image: "registry.redhat.io/openshift4/ose-prometheus:v4.6"
