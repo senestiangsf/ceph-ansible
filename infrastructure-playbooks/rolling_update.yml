@@ -938,7 +938,7 @@
   post_tasks:
     - name: reboot the iscsigws
       reboot:
-         reboot_timeout: 240
+         reboot_timeout: 720
   tasks:
     # failed_when: false is here so that if we upgrade
     # from a version of ceph that does not have iscsi gws
